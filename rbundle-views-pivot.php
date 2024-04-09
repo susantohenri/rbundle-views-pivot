@@ -31,9 +31,23 @@ define('RBUNDLE_VIEWS_PIVOT_CONFIG', [
 ]);
 
 register_activation_hook(__FILE__, function () {
+    global $wpdb;
+    $wpdb->query("
+        CREATE TABLE `{$wpdb->prefix}frm_views_pivot` (
+            `id` bigint(20) NOT NULL AUTO_INCREMENT,
+            `views_id` bigint(20) DEFAULT NULL,
+            `form_id` bigint(20) DEFAULT NULL,
+            `column_name` varchar(255) DEFAULT NULL,
+            `user_id` bigint(20) DEFAULT NULL,
+            `meta_value` varchar(255) DEFAULT NULL,
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+    ");
 });
 
 register_deactivation_hook(__FILE__, function () {
+    global $wpdb;
+    $wpdb->query("DROP TABLE `{$wpdb->prefix}frm_views_pivot`");
 });
 
 add_action('frm_after_create_entry', function ($entry_id, $form_id) {
