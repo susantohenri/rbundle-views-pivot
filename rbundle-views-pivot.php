@@ -29,24 +29,24 @@ define('RBUNDLE_VIEWS_PIVOT_CONFIG', [
         'user_rating',
     ]
 ]);
+define('RBUNDLE_VIEWS_PIVOT_TABLE_NAME', 'frm_views_pivot');
 
 register_activation_hook(__FILE__, function () {
     global $wpdb;
+    $table_name = $wpdb->prefix . RBUNDLE_VIEWS_PIVOT_TABLE_NAME;
     $wpdb->query("
-        CREATE TABLE `{$wpdb->prefix}frm_views_pivot` (
+        CREATE TABLE `{$table_name}` (
             `id` bigint(20) NOT NULL AUTO_INCREMENT,
-            `views_id` bigint(20) DEFAULT NULL,
             `form_id` bigint(20) DEFAULT NULL,
             `column_name` varchar(255) DEFAULT NULL,
             `entry_id` bigint(20) DEFAULT NULL,
             `user_id` bigint(20) DEFAULT NULL,
             `meta_value` varchar(255) DEFAULT NULL,
             PRIMARY KEY (`id`),
-            KEY `{$wpdb->prefix}frm_views_pivot_views_id_idx` (`views_id`) USING BTREE,
-            KEY `{$wpdb->prefix}frm_views_pivot_form_id_idx` (`form_id`) USING BTREE,
-            KEY `{$wpdb->prefix}frm_views_pivot_column_name_idx` (`column_name`) USING BTREE,
-            KEY `{$wpdb->prefix}frm_views_pivot_entry_id_idx` (`entry_id`) USING BTREE,
-            KEY `{$wpdb->prefix}frm_views_pivot_user_id_idx` (`user_id`) USING BTREE
+            KEY `{$table_name}_form_id_idx` (`form_id`) USING BTREE,
+            KEY `{$table_name}_column_name_idx` (`column_name`) USING BTREE,
+            KEY `{$table_name}_entry_id_idx` (`entry_id`) USING BTREE,
+            KEY `{$table_name}_user_id_idx` (`user_id`) USING BTREE
         ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
     ");
 
@@ -56,10 +56,11 @@ register_activation_hook(__FILE__, function () {
     foreach (RBUNDLE_VIEWS_PIVOT_CONFIG as $form_id => $functions) {
         $entry_ids = array_map(function ($record) {
             return $record->id;
-        }, $wpdb->get_results("SELECT id FROM {$wpdb->prefix}frm_items"));
+        }, $wpdb->get_results("SELECT id FROM {$wpdb->prefix}frm_items WHERE form_id = {$form_id}"));
 
         foreach ($user_ids as $user_id) {
             foreach ($entry_ids as $entry_id) {
+                // rvp_clean_up($entry_id, $user_id);
                 foreach ($functions  as $function) {
                     $function_name = "rvp_{$form_id}_{$function}";
                     $function_name($entry_id, $user_id);
@@ -71,7 +72,8 @@ register_activation_hook(__FILE__, function () {
 
 register_deactivation_hook(__FILE__, function () {
     global $wpdb;
-    $wpdb->query("DROP TABLE `{$wpdb->prefix}frm_views_pivot`");
+    $table_name = $wpdb->prefix . RBUNDLE_VIEWS_PIVOT_TABLE_NAME;
+    $wpdb->query("DROP TABLE `{$table_name}`");
 });
 
 add_action('frm_after_create_entry', function ($entry_id, $form_id) {
@@ -91,8 +93,45 @@ add_shortcode('rbundle-pivot-value', function ($atts) {
     $user_id = get_current_user_id();
 });
 
+function rvp_debug($string)
+{
+    global $wpdb;
+    $wpdb->insert("{$wpdb->prefix}options", [
+        'option_name' => 'rvp' . rand(),
+        'option_value' => $string
+    ]);
+}
+
+function rvp_clean_up($entry_id, $user_id)
+{
+    global $wpdb;
+    $wpdb->delete($wpdb->prefix . RBUNDLE_VIEWS_PIVOT_TABLE_NAME, [
+        'entry_id' => $entry_id,
+        'user_id' => $user_id
+    ]);
+}
+
 function rvp_58_star_shortlist($entry_id, $user_id)
 {
+    global $wpdb;
+    $starred = ($wpdb->get_row("
+        SELECT
+            answer_5261.item_id
+        FROM {$wpdb->prefix}frm_item_metas answer_5261
+        LEFT JOIN {$wpdb->prefix}frm_item_metas answer_5262 ON answer_5261.item_id = answer_5262.item_id
+        LEFT JOIN {$wpdb->prefix}frm_item_metas answer_5263 ON answer_5261.item_id = answer_5263.item_id
+        WHERE answer_5261.meta_value = {$user_id}
+        AND answer_5262.meta_value = 1
+        AND answer_5263.meta_value = {$entry_id}
+    ")) ? 1 : 0;
+
+    $wpdb->insert($wpdb->prefix . RBUNDLE_VIEWS_PIVOT_TABLE_NAME, [
+        'form_id' => 58,
+        'column_name' => 'star_shortlist',
+        'entry_id' => $entry_id,
+        'user_id' => $user_id,
+        'meta_value' => $starred
+    ]);
 }
 
 function rvp_58_your_proposal($entry_id, $user_id)
