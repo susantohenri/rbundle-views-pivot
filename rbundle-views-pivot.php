@@ -86,6 +86,20 @@ add_action('frm_before_destroy_entry', function ($entry_id) {
 });
 
 add_filter('frm_view_order', function ($query, $args) {
+    if (isset($args['order_by_array'][0])) {
+        $column_names = [];
+        foreach (RBUNDLE_VIEWS_PIVOT_CONFIG as $form_id => $col_names) $column_names = array_merge($column_names, $col_names);
+        $order_field = $args['order_by_array'][0];
+        if (in_array($order_field, $column_names)) {
+            global $wpdb;
+            $logged_in = get_current_user_id();
+            $table_name = $wpdb->prefix . RBUNDLE_VIEWS_PIVOT_TABLE_NAME;
+            $order_type = $args['order_array'][0];
+            $query['select'] = "SELECT it.id FROM {$wpdb->prefix}frm_items it LEFT JOIN {$table_name} em0 ON em0.entry_id=it.id AND em0.user_id={$logged_in} AND em0.column_name='{$order_field}' ";
+            $query['order'] = "ORDER BY CASE WHEN em0.meta_value IS NULL THEN 1 ELSE 0 END, em0.meta_value {$order_type}, ";
+        }
+    }
+
     return $query;
 }, 10, 2);
 
