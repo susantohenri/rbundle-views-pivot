@@ -47,7 +47,7 @@ register_activation_hook(__FILE__, function () {
             KEY `{$table_name}_column_name_idx` (`column_name`) USING BTREE,
             KEY `{$table_name}_entry_id_idx` (`entry_id`) USING BTREE,
             KEY `{$table_name}_user_id_idx` (`user_id`) USING BTREE
-        ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+       ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
     ");
 
     $user_ids = array_map(function ($record) {
@@ -60,10 +60,9 @@ register_activation_hook(__FILE__, function () {
 
         foreach ($user_ids as $user_id) {
             foreach ($entry_ids as $entry_id) {
-                // rvp_clean_up($entry_id, $user_id);
                 foreach ($functions  as $function) {
                     $function_name = "rvp_{$form_id}_{$function}";
-                    $function_name($entry_id, $user_id);
+                    $function_name($entry_id, $user_id, 'plugin_activation');
                 }
             }
         }
@@ -77,13 +76,24 @@ register_deactivation_hook(__FILE__, function () {
 });
 
 add_action('frm_after_create_entry', function ($entry_id, $form_id) {
+    if (156 == $form_id) rvp_156_star_shortlist($entry_id, 'post_create');
 }, 30, 2);
 
+add_filter('frm_pre_update_entry', function ($values, $entry_id) {
+    rvp_156_star_shortlist($entry_id, 'pre_update');
+    return $values;
+}, 10, 2);
+
 add_action('frm_after_update_entry', function ($entry_id, $form_id) {
+    if (156 == $form_id) rvp_156_star_shortlist($entry_id, 'post_update');
 }, 10, 2);
 
 add_action('frm_before_destroy_entry', function ($entry_id) {
 });
+
+add_action('frm_after_destroy_entry', function ($entry_id, $entry) {
+    if (156 == $entry->form_id) rvp_156_star_shortlist($entry_id, 'post_delete', $entry->metas);
+}, 10, 2);
 
 add_filter('frm_view_order', function ($query, $args) {
     if (isset($args['order_by_array'][0])) {
@@ -116,16 +126,48 @@ function rvp_debug($string)
     ]);
 }
 
-function rvp_clean_up($entry_id, $user_id)
+function rvp_156_star_shortlist($entry_156_id, $event, $entry_156 = null)
+{
+    global $wpdb;
+    $pivot_user_id = $entry_156 ? $entry_156[5261] : $wpdb->get_var("
+        SELECT meta_value
+        FROM {$wpdb->prefix}frm_item_metas answer
+        WHERE item_id = {$entry_156_id}
+        AND field_id = 5261
+    ");
+    if (!$pivot_user_id) return false;
+    $entry_58_id = $entry_156 ? $entry_156[5263] : $wpdb->get_var("
+        SELECT meta_value
+        FROM {$wpdb->prefix}frm_item_metas answer
+        WHERE item_id = {$entry_156_id}
+        AND field_id = 5263
+    ");
+    switch ($event) {
+        case 'post_create':
+        case 'post_update':
+            rvp_156_star_shortlist_create($entry_58_id, $pivot_user_id);
+            break;
+        case 'pre_update':
+            rvp_156_star_shortlist_delete($entry_58_id, $pivot_user_id);
+            break;
+        case 'post_delete':
+            rvp_156_star_shortlist_create($entry_58_id, $pivot_user_id);
+            break;
+    }
+}
+
+function rvp_156_star_shortlist_delete($entry_58_id, $pivot_user_id)
 {
     global $wpdb;
     $wpdb->delete($wpdb->prefix . RBUNDLE_VIEWS_PIVOT_TABLE_NAME, [
-        'entry_id' => $entry_id,
-        'user_id' => $user_id
+        'form_id' => 58,
+        'column_name' => 'star_shortlist',
+        'entry_id' => $entry_58_id,
+        'user_id' => $pivot_user_id,
     ]);
 }
 
-function rvp_58_star_shortlist($entry_id, $user_id)
+function rvp_156_star_shortlist_create($entry_58_id, $pivot_user_id)
 {
     global $wpdb;
     $starred = ($wpdb->get_row("
@@ -134,18 +176,32 @@ function rvp_58_star_shortlist($entry_id, $user_id)
         FROM {$wpdb->prefix}frm_item_metas answer_5261
         LEFT JOIN {$wpdb->prefix}frm_item_metas answer_5262 ON answer_5261.item_id = answer_5262.item_id
         LEFT JOIN {$wpdb->prefix}frm_item_metas answer_5263 ON answer_5261.item_id = answer_5263.item_id
-        WHERE answer_5261.meta_value = {$user_id}
+        WHERE answer_5261.meta_value = {$pivot_user_id}
         AND answer_5262.meta_value = 1
-        AND answer_5263.meta_value = {$entry_id}
+        AND answer_5263.meta_value = {$entry_58_id}
     ")) ? 1 : 0;
 
+    rvp_156_star_shortlist_delete($entry_58_id, $pivot_user_id);
     $wpdb->insert($wpdb->prefix . RBUNDLE_VIEWS_PIVOT_TABLE_NAME, [
         'form_id' => 58,
         'column_name' => 'star_shortlist',
-        'entry_id' => $entry_id,
-        'user_id' => $user_id,
+        'entry_id' => $entry_58_id,
+        'user_id' => $pivot_user_id,
         'meta_value' => $starred
     ]);
+}
+
+function rvp_58_star_shortlist($entry_58_id, $user_id, $event)
+{
+    switch ($event) {
+        case 'plugin_activation':
+        case 'post_create_entry_58':
+            rvp_156_star_shortlist_create($entry_58_id, $user_id);
+            break;
+        case 'pre_delete_entry_58':
+            rvp_156_star_shortlist_delete($entry_58_id, $user_id);
+            break;
+    }
 }
 
 function rvp_58_your_proposal($entry_id, $user_id)
